@@ -17,7 +17,7 @@ const io = new Server(server, {
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 // Set up specific sub-routers if we get larger
