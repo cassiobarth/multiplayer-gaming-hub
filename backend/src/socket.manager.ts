@@ -14,6 +14,8 @@ interface RoomData {
     currentPlayerIndex: number; // 0 or 1
     scores: [number, number];
     flippedIndices: number[];
+    gridCols: number;
+    gridRows: number;
   };
 }
 
@@ -34,7 +36,9 @@ export function setupSockets(io: Server) {
             cards: [],
             currentPlayerIndex: 0,
             scores: [0, 0],
-            flippedIndices: []
+            flippedIndices: [],
+            gridCols: 4,
+            gridRows: 4
           } 
         };
       }
@@ -66,12 +70,21 @@ export function setupSockets(io: Server) {
     // ---- MEMORY GAME ACTIONS ---- //
     
     // 1. Initialize custom pack
-    socket.on('memory_init', ({ roomId, images }: { roomId: string, images: string[] }) => {
+    socket.on('memory_init', ({ roomId, images, gridCols = 4, gridRows = 4 }: { roomId: string, images: string[], gridCols?: number, gridRows?: number }) => {
       const room = activeRooms[roomId];
       if (!room) return;
       
+      const totalPairs = (gridCols * gridRows) / 2;
+      const deckImages: string[] = [];
+      
+      let imgIndex = 0;
+      for (let i = 0; i < totalPairs; i++) {
+        deckImages.push(images[imgIndex % images.length]);
+        imgIndex++;
+      }
+
       // Create pairs
-      const rawCards = [...images, ...images].map((imgUrl, i) => ({
+      const rawCards = [...deckImages, ...deckImages].map((imgUrl, i) => ({
         id: i,
         imageId: imgUrl,
         isFlipped: false,
@@ -85,7 +98,9 @@ export function setupSockets(io: Server) {
         cards: shuffled,
         currentPlayerIndex: 0,
         scores: [0, 0],
-        flippedIndices: []
+        flippedIndices: [],
+        gridCols,
+        gridRows
       };
 
       io.to(roomId).emit('memory_state_update', room.gameState);

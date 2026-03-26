@@ -13,18 +13,19 @@ interface MemoryGameBoardProps {
   isMyTurn: boolean;
   onCardFlip: (cardIndex: number) => void;
   gameStateCards: CardType[];
+  gridCols?: number;
 }
 
 const MemoryGameBoard: React.FC<MemoryGameBoardProps> = ({ 
   isMyTurn, 
   onCardFlip, 
-  gameStateCards 
+  gameStateCards,
+  gridCols
 }) => {
   // Calculate grid dimensions dynamically
   // Math.ceil(Math.sqrt(total_cards))
   const totalCards = gameStateCards.length;
-  // Fallback default structure
-  const cols = Math.ceil(Math.sqrt(totalCards)) || 4;
+  const cols = gridCols || Math.ceil(Math.sqrt(totalCards)) || 4;
 
   return (
     <div className={`memory-board-container ${isMyTurn ? 'my-turn' : 'waiting-turn'}`}>
@@ -49,7 +50,7 @@ const MemoryGameBoard: React.FC<MemoryGameBoardProps> = ({
           </div>
         ))}
       </div>
-      {!isMyTurn && <div className="turn-overlay">Waiting for opponent... did they fall asleep? 😴</div>}
+      {!isMyTurn && <div className="turn-overlay">Vez do adversário... será que ele adormeceu? 😴</div>}
     </div>
   );
 };

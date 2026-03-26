@@ -6,16 +6,27 @@ interface GameState {
   currentPlayerIndex: number;
   scores: [number, number];
   flippedIndices: number[];
+  gridCols: number;
+  gridRows: number;
 }
 
 export const useLocalMemoryGame = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
 
-  const initLocalGame = useCallback((images: string[]) => {
+  const initLocalGame = useCallback((images: string[], gridCols: number = 4, gridRows: number = 4) => {
+    const totalPairs = (gridCols * gridRows) / 2;
+    const deckImages: string[] = [];
+    
+    let imgIndex = 0;
+    for (let i = 0; i < totalPairs; i++) {
+      deckImages.push(images[imgIndex % images.length]);
+      imgIndex++;
+    }
+
     // Create pairs
     const deck: CardType[] = [];
     let idCounter = 0;
-    images.forEach((img) => {
+    deckImages.forEach((img) => {
       deck.push({ id: idCounter++, imageId: img, isFlipped: false, isMatched: false });
       deck.push({ id: idCounter++, imageId: img, isFlipped: false, isMatched: false });
     });
@@ -30,7 +41,9 @@ export const useLocalMemoryGame = () => {
       cards: deck,
       currentPlayerIndex: 0,
       scores: [0, 0],
-      flippedIndices: []
+      flippedIndices: [],
+      gridCols,
+      gridRows
     });
   }, []);
 

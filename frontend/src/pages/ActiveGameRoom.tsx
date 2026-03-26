@@ -11,6 +11,8 @@ interface GameState {
   currentPlayerIndex: number;
   scores: [number, number];
   flippedIndices: number[];
+  gridCols?: number;
+  gridRows?: number;
 }
 
 const ActiveGameRoom: React.FC = () => {
@@ -26,6 +28,7 @@ const ActiveGameRoom: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isLocalMode, setIsLocalMode] = useState(false);
+  const [gridSize, setGridSize] = useState<{ cols: number, rows: number }>({ cols: 4, rows: 4 });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const { localGameState, initLocalGame, handleLocalFlip } = useLocalMemoryGame();
@@ -55,7 +58,7 @@ const ActiveGameRoom: React.FC = () => {
     
     if (isLocalMode) {
       const urls = Array.from(e.target.files).map(file => URL.createObjectURL(file));
-      initLocalGame(urls);
+      initLocalGame(urls, gridSize.cols, gridSize.rows);
       if (e.target) e.target.value = '';
       return;
     }
@@ -83,7 +86,7 @@ const ActiveGameRoom: React.FC = () => {
             // URLs are relative to backend server like /uploads/...
             // Since we serve static files, we map to absolute URLs
             const absoluteUrls = data.urls.map((url: string) => `${BACKEND_URL}${url}`);
-            socket.emit('memory_init', { roomId, images: absoluteUrls });
+            socket.emit('memory_init', { roomId, images: absoluteUrls, gridCols: gridSize.cols, gridRows: gridSize.rows });
         }
     } catch (err) {
         console.error('Upload failed', err);
@@ -100,10 +103,10 @@ const ActiveGameRoom: React.FC = () => {
   const handleCupheadLoad = () => {
     const cupheadUrls = Array.from({length: 6}, (_, i) => `${window.location.origin}/cuphead/${i + 1}.png`);
     if (isLocalMode) {
-      initLocalGame(cupheadUrls);
+      initLocalGame(cupheadUrls, gridSize.cols, gridSize.rows);
     } else {
       if (!socket) return;
-      socket.emit('memory_init', { roomId, images: cupheadUrls });
+      socket.emit('memory_init', { roomId, images: cupheadUrls, gridCols: gridSize.cols, gridRows: gridSize.rows });
     }
   };
 
@@ -122,7 +125,7 @@ const ActiveGameRoom: React.FC = () => {
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
-    alert('Link copied to clipboard!');
+    alert('Link copiado para a área de transferência!');
   };
 
   return (
@@ -130,19 +133,19 @@ const ActiveGameRoom: React.FC = () => {
       {/* Game Area (Left Side) */}
       <div className="game-area">
         <h2 style={{ position: 'absolute', top: '2rem', left: '2rem', color: 'rgba(255,255,255,0.4)', zIndex: 0 }}>
-          Secret Lair Code: <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{roomId}</span>
+          Código da Sala: <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{roomId}</span>
         </h2>
         
         <div style={{ zIndex: 1, width: '100%' }}>
           {!activeGameState || activeGameState.cards.length === 0 ? (
             <div style={{ textAlign: 'center' }}>
-              <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>Memory Game</h2>
+              <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>Jogo da Memória</h2>
               <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '1.2rem' }}>
                 {isLocalMode 
-                  ? 'Local Mode activated! Upload local pictures. No internet required.' 
+                  ? 'Modo Local ativado! Faça o upload das fotos locais. Não precisa de internet.' 
                   : players.length < 2 
-                    ? 'Waiting for your victim... I mean opponent. Configure the game while they dilly-dally.' 
-                    : 'A challenger has appeared! Upload some embarrassing photos for the deck.'}
+                    ? 'Aguardando o outro jogador entrar. Que tal configurar o jogo enquanto isso?' 
+                    : 'O outro jogador chegou! Crie o baralho para começarmos.'}
               </p>
               
               {!isLocalMode && players.length < 2 && (
@@ -150,14 +153,23 @@ const ActiveGameRoom: React.FC = () => {
                   onClick={() => setIsLocalMode(true)} 
                   style={{ marginBottom: '2rem', background: '#eab308', color: '#1c1917', border: 'none' }}
                 >
-                  Go Offline/Local Play 🤖
+                  Modo Offline / Teste Local 🤖
                 </button>
               )}
               
+              <div style={{ marginBottom: '2rem', background: 'var(--panel-bg)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', display: 'inline-block' }}>
+                <h3 style={{ marginBottom: '1rem' }}>Configuração do Tabuleiro</h3>
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                  <button onClick={() => setGridSize({cols: 4, rows: 4})} style={{ padding: '0.6em 1.2em', borderRadius: '8px', cursor: 'pointer', border: 'none', background: gridSize.cols === 4 && gridSize.rows === 4 ? 'var(--primary)' : '#334155', color: 'white' }}>4x4</button>
+                  <button onClick={() => setGridSize({cols: 8, rows: 8})} style={{ padding: '0.6em 1.2em', borderRadius: '8px', cursor: 'pointer', border: 'none', background: gridSize.cols === 8 && gridSize.rows === 8 ? 'var(--primary)' : '#334155', color: 'white' }}>8x8</button>
+                  <button onClick={() => setGridSize({cols: 16, rows: 6})} style={{ padding: '0.6em 1.2em', borderRadius: '8px', cursor: 'pointer', border: 'none', background: gridSize.cols === 16 && gridSize.rows === 6 ? 'var(--primary)' : '#334155', color: 'white' }}>16x6</button>
+                </div>
+              </div>
+
               <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '12px', border: '1px dashed var(--glass-border)', display: 'inline-block' }}>
-                <h3 style={{ marginBottom: '1rem' }}>Upload Image Pack</h3>
+                <h3 style={{ marginBottom: '1rem' }}>Fazer Upload do Baralho</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                  Pick multiple pics. The sillier, the better.
+                  Escolha várias fotos. O jogo preencherá o tabuleiro {gridSize.cols}x{gridSize.rows} automaticamente.
                 </p>
                 {uploadError && <div style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.9rem' }}>{uploadError}</div>}
                 
@@ -175,15 +187,15 @@ const ActiveGameRoom: React.FC = () => {
                   disabled={isUploading}
                   style={{ display: 'inline-block', background: 'var(--primary)', padding: '0.8em 1.5em', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: 'white', border: 'none' }}
                 >
-                  {isUploading ? 'Uploading...' : 'Choose Images'}
+                  {isUploading ? 'Enviando...' : 'Escolher Imagens'}
                 </button>
                 <div style={{ marginTop: '1rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1rem' }}>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Or play instantly with a preloaded pack:</p>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Ou comece agora com um baralho pronto:</p>
                   <button 
                     onClick={handleCupheadLoad}
                     style={{ background: '#f59e0b', padding: '0.6em 1.2em', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: 'white', border: 'none' }}
                   >
-                    🎲 Play with Cuphead Theme
+                    🎲 Jogar com Minigame do Cuphead
                   </button>
                 </div>
               </div>
@@ -193,10 +205,10 @@ const ActiveGameRoom: React.FC = () => {
               {/* Score Header */}
               <div style={{ display: 'flex', justifyContent: 'center', gap: '3rem', marginBottom: '1rem' }}>
                 <div style={{ fontSize: '1.5rem', fontWeight: activeMyPlayerIndex === 0 ? 'bold' : 'normal', color: activeGameState.currentPlayerIndex === 0 ? 'var(--primary)' : 'white' }}>
-                  P1 Score: {activeGameState.scores[0]} {(activeMyPlayerIndex === 0 || isLocalMode) && '(You)'}
+                  P1 Pontos: {activeGameState.scores[0]} {(activeMyPlayerIndex === 0 || isLocalMode) && '(Você)'}
                 </div>
                 <div style={{ fontSize: '1.5rem', fontWeight: activeMyPlayerIndex === 1 ? 'bold' : 'normal', color: activeGameState.currentPlayerIndex === 1 ? 'var(--primary)' : 'white' }}>
-                  P2 Score: {activeGameState.scores[1]} {(activeMyPlayerIndex === 1 || isLocalMode) && '(You)'}
+                  P2 Pontos: {activeGameState.scores[1]} {(activeMyPlayerIndex === 1 || isLocalMode) && '(Você)'}
                 </div>
               </div>
 
@@ -206,6 +218,7 @@ const ActiveGameRoom: React.FC = () => {
                 isMyTurn={activeIsMyTurn}
                 onCardFlip={handleCardFlip}
                 gameStateCards={activeGameState.cards}
+                gridCols={activeGameState.gridCols}
               />
             </>
           )}
@@ -217,36 +230,36 @@ const ActiveGameRoom: React.FC = () => {
         
         {/* Remote Player Video */}
         <div className="video-card">
-          <div className="video-nameplate">{players.length === 2 ? 'The Enemy' : `Summoning... (${players.length}/2)`}</div>
+          <div className="video-nameplate">{players.length === 2 ? 'Adversário' : `Conectando... (${players.length}/2)`}</div>
           <video autoPlay playsInline ref={remoteVideoRef} />
           {!remoteVideoRef.current && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-              Connecting...
+              Aguardando conexão...
             </div>
           )}
         </div>
 
         {/* Local Player Video */}
         <div className="video-card">
-          <div className="video-nameplate">{playerName} (The Legend)</div>
+          <div className="video-nameplate">{playerName} (Você)</div>
           <video autoPlay playsInline muted ref={localVideoRef} />
           {!isCamEnabled ? (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', zIndex: 10 }}>
                <button onClick={startCamera} style={{ padding: '0.8rem 1.5rem', fontSize: '0.9rem', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                 <span>📷</span> Join Call
+                 <span>📷</span> Entrar na Chamada
                </button>
             </div>
           ) : !localVideoRef.current && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-              Camera starting...
+              Iniciando câmera...
             </div>
           )}
         </div>
         
         {/* Controls */}
         <div style={{ marginTop: 'auto', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-          <button onClick={handleCopyLink} style={{ padding: '0.8rem', flex: 1, fontSize: '0.9rem', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)' }}>Brag (Copy Link)</button>
-          <button onClick={handleLeave} style={{ padding: '0.8rem', flex: 1, fontSize: '0.9rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.5)' }}>Rage Quit</button>
+          <button onClick={handleCopyLink} style={{ padding: '0.8rem', flex: 1, fontSize: '0.9rem', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)' }}>Copiar Link</button>
+          <button onClick={handleLeave} style={{ padding: '0.8rem', flex: 1, fontSize: '0.9rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.5)' }}>Sair da Sala</button>
         </div>
       </div>
     </div>

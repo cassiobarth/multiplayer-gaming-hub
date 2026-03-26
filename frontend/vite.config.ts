@@ -12,7 +12,7 @@ export default defineConfig({
       manifest: {
         name: 'Super Serious Family Game Hub',
         short_name: 'GameHub',
-        description: 'Prepare to humiliate your family in these highly competitive (but totally chill) games.',
+        description: 'Prepare-se para se divertir com sua família nesses jogos super amigáveis e descontraídos.',
         theme_color: '#1e1b4b',
         background_color: '#1e1b4b',
         display: 'standalone',
