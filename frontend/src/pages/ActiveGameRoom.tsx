@@ -97,6 +97,16 @@ const ActiveGameRoom: React.FC = () => {
     }
   };
 
+  const handleCupheadLoad = () => {
+    const cupheadUrls = Array.from({length: 6}, (_, i) => `${window.location.origin}/cuphead/${i + 1}.png`);
+    if (isLocalMode) {
+      initLocalGame(cupheadUrls);
+    } else {
+      if (!socket) return;
+      socket.emit('memory_init', { roomId, images: cupheadUrls });
+    }
+  };
+
   const handleCardFlip = (index: number) => {
     if (isLocalMode) {
        handleLocalFlip(index);
@@ -167,6 +177,15 @@ const ActiveGameRoom: React.FC = () => {
                 >
                   {isUploading ? 'Uploading...' : 'Choose Images'}
                 </button>
+                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1rem' }}>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Or play instantly with a preloaded pack:</p>
+                  <button 
+                    onClick={handleCupheadLoad}
+                    style={{ background: '#f59e0b', padding: '0.6em 1.2em', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: 'white', border: 'none' }}
+                  >
+                    🎲 Play with Cuphead Theme
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
