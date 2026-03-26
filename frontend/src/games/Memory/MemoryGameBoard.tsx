@@ -49,7 +49,7 @@ const MemoryGameBoard: React.FC<MemoryGameBoardProps> = ({
           </div>
         ))}
       </div>
-      {!isMyTurn && <div className="turn-overlay">Esperando a jogada do oponente...</div>}
+      {!isMyTurn && <div className="turn-overlay">Waiting for opponent... did they fall asleep? 😴</div>}
     </div>
   );
 };

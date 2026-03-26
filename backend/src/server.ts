@@ -17,7 +17,10 @@ const io = new Server(server, {
 });
 
 // Middleware
-app.use(cors({ origin: '*' }));
+app.use(cors({ 
+  origin: '*',
+  allowedHeaders: ['Content-Type', 'Authorization', 'Bypass-Tunnel-Reminder', 'ngrok-skip-browser-warning']
+}));
 app.use(express.json());
 
 // Set up specific sub-routers if we get larger

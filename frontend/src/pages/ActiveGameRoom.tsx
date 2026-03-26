@@ -4,6 +4,7 @@ import { useSocket } from '../core/hooks/useSocket';
 import { useWebRTC } from '../core/hooks/useWebRTC';
 import { BACKEND_URL } from '../core/config';
 import MemoryGameBoard, { type CardType } from '../games/Memory/MemoryGameBoard';
+import { useLocalMemoryGame } from '../core/hooks/useLocalMemoryGame';
 
 interface GameState {
   cards: CardType[];
@@ -24,11 +25,18 @@ const ActiveGameRoom: React.FC = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isLocalMode, setIsLocalMode] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const { localGameState, initLocalGame, handleLocalFlip } = useLocalMemoryGame();
 
   // My player index in the room (0 or 1)
   const myPlayerIndex = players.indexOf(socket?.id || '');
   const isMyTurn = gameState?.currentPlayerIndex === myPlayerIndex;
+
+  const activeGameState = isLocalMode ? localGameState : gameState;
+  const activeMyPlayerIndex = isLocalMode ? localGameState?.currentPlayerIndex ?? 0 : myPlayerIndex;
+  const activeIsMyTurn = isLocalMode ? true : isMyTurn;
 
   useEffect(() => {
     if (!socket) return;
@@ -43,7 +51,16 @@ const ActiveGameRoom: React.FC = () => {
   }, [socket]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length || !socket) return;
+    if (!e.target.files?.length) return;
+    
+    if (isLocalMode) {
+      const urls = Array.from(e.target.files).map(file => URL.createObjectURL(file));
+      initLocalGame(urls);
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    if (!socket) return;
     setIsUploading(true);
     setUploadError(null);
 
@@ -55,7 +72,11 @@ const ActiveGameRoom: React.FC = () => {
     try {
         const response = await fetch(`${BACKEND_URL}/api/upload-pack`, {
             method: 'POST',
-            body: formData
+            body: formData,
+            headers: {
+                "Bypass-Tunnel-Reminder": "true",
+                "ngrok-skip-browser-warning": "true"
+            }
         });
         const data = await response.json();
         if (data.success && data.urls) {
@@ -66,7 +87,8 @@ const ActiveGameRoom: React.FC = () => {
         }
     } catch (err) {
         console.error('Upload failed', err);
-        setUploadError('Failed to connect to backend server. Make sure it is running!');
+        const errMsg = err instanceof Error ? err.message : String(err);
+        setUploadError(`Error: ${errMsg}. Check console for details.`);
     } finally {
         setIsUploading(false);
         if (e.target) {
@@ -76,6 +98,10 @@ const ActiveGameRoom: React.FC = () => {
   };
 
   const handleCardFlip = (index: number) => {
+    if (isLocalMode) {
+       handleLocalFlip(index);
+       return;
+    }
     if (!socket || !isMyTurn) return;
     socket.emit('memory_flip', { roomId, cardIndex: index });
   };
@@ -94,21 +120,34 @@ const ActiveGameRoom: React.FC = () => {
       {/* Game Area (Left Side) */}
       <div className="game-area">
         <h2 style={{ position: 'absolute', top: '2rem', left: '2rem', color: 'rgba(255,255,255,0.4)', zIndex: 0 }}>
-          Room Code: <span style={{ color: 'var(--primary)' }}>{roomId}</span>
+          Secret Lair Code: <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{roomId}</span>
         </h2>
         
         <div style={{ zIndex: 1, width: '100%' }}>
-          {!gameState || gameState.cards.length === 0 ? (
+          {!activeGameState || activeGameState.cards.length === 0 ? (
             <div style={{ textAlign: 'center' }}>
               <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>Memory Game</h2>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-                {players.length < 2 ? 'Waiting for other player to join... but you can configure the game now.' : 'Players connected! Upload or wait for a Custom Pack.'}
+              <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '1.2rem' }}>
+                {isLocalMode 
+                  ? 'Local Mode activated! Upload local pictures. No internet required.' 
+                  : players.length < 2 
+                    ? 'Waiting for your victim... I mean opponent. Configure the game while they dilly-dally.' 
+                    : 'A challenger has appeared! Upload some embarrassing photos for the deck.'}
               </p>
+              
+              {!isLocalMode && players.length < 2 && (
+                <button 
+                  onClick={() => setIsLocalMode(true)} 
+                  style={{ marginBottom: '2rem', background: '#eab308', color: '#1c1917', border: 'none' }}
+                >
+                  Go Offline/Local Play 🤖
+                </button>
+              )}
               
               <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '12px', border: '1px dashed var(--glass-border)', display: 'inline-block' }}>
                 <h3 style={{ marginBottom: '1rem' }}>Upload Image Pack</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                  Select multiple images to create the deck.
+                  Pick multiple pics. The sillier, the better.
                 </p>
                 {uploadError && <div style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.9rem' }}>{uploadError}</div>}
                 
@@ -134,20 +173,20 @@ const ActiveGameRoom: React.FC = () => {
             <>
               {/* Score Header */}
               <div style={{ display: 'flex', justifyContent: 'center', gap: '3rem', marginBottom: '1rem' }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: myPlayerIndex === 0 ? 'bold' : 'normal', color: gameState.currentPlayerIndex === 0 ? 'var(--primary)' : 'white' }}>
-                  P1 Score: {gameState.scores[0]} {myPlayerIndex === 0 && '(You)'}
+                <div style={{ fontSize: '1.5rem', fontWeight: activeMyPlayerIndex === 0 ? 'bold' : 'normal', color: activeGameState.currentPlayerIndex === 0 ? 'var(--primary)' : 'white' }}>
+                  P1 Score: {activeGameState.scores[0]} {(activeMyPlayerIndex === 0 || isLocalMode) && '(You)'}
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: myPlayerIndex === 1 ? 'bold' : 'normal', color: gameState.currentPlayerIndex === 1 ? 'var(--primary)' : 'white' }}>
-                  P2 Score: {gameState.scores[1]} {myPlayerIndex === 1 && '(You)'}
+                <div style={{ fontSize: '1.5rem', fontWeight: activeMyPlayerIndex === 1 ? 'bold' : 'normal', color: activeGameState.currentPlayerIndex === 1 ? 'var(--primary)' : 'white' }}>
+                  P2 Score: {activeGameState.scores[1]} {(activeMyPlayerIndex === 1 || isLocalMode) && '(You)'}
                 </div>
               </div>
 
               {/* Memory Board */}
               <MemoryGameBoard 
-                images={[]} // Images are inside gameStateCards
-                isMyTurn={isMyTurn}
+                images={[]} // Images are inside activeGameState.cards
+                isMyTurn={activeIsMyTurn}
                 onCardFlip={handleCardFlip}
-                gameStateCards={gameState.cards}
+                gameStateCards={activeGameState.cards}
               />
             </>
           )}
@@ -159,7 +198,7 @@ const ActiveGameRoom: React.FC = () => {
         
         {/* Remote Player Video */}
         <div className="video-card">
-          <div className="video-nameplate">{players.length === 2 ? 'Opponent' : `Waiting... (${players.length}/2)`}</div>
+          <div className="video-nameplate">{players.length === 2 ? 'The Enemy' : `Summoning... (${players.length}/2)`}</div>
           <video autoPlay playsInline ref={remoteVideoRef} />
           {!remoteVideoRef.current && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
@@ -170,7 +209,7 @@ const ActiveGameRoom: React.FC = () => {
 
         {/* Local Player Video */}
         <div className="video-card">
-          <div className="video-nameplate">{playerName} (You)</div>
+          <div className="video-nameplate">{playerName} (The Legend)</div>
           <video autoPlay playsInline muted ref={localVideoRef} />
           {!isCamEnabled ? (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', zIndex: 10 }}>
@@ -187,8 +226,8 @@ const ActiveGameRoom: React.FC = () => {
         
         {/* Controls */}
         <div style={{ marginTop: 'auto', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-          <button onClick={handleCopyLink} style={{ padding: '0.8rem', flex: 1, fontSize: '0.9rem', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)' }}>Copy Link</button>
-          <button onClick={handleLeave} style={{ padding: '0.8rem', flex: 1, fontSize: '0.9rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.5)' }}>Leave</button>
+          <button onClick={handleCopyLink} style={{ padding: '0.8rem', flex: 1, fontSize: '0.9rem', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)' }}>Brag (Copy Link)</button>
+          <button onClick={handleLeave} style={{ padding: '0.8rem', flex: 1, fontSize: '0.9rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.5)' }}>Rage Quit</button>
         </div>
       </div>
     </div>

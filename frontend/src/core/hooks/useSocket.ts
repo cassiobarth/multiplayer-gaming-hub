@@ -12,7 +12,11 @@ export const useSocket = (roomId: string) => {
 
   useEffect(() => {
     const socketInstance = io(SOCKET_SERVER_URL, {
-      transports: ['websocket']
+      transports: ['websocket'],
+      extraHeaders: {
+        "Bypass-Tunnel-Reminder": "true",
+        "ngrok-skip-browser-warning": "true"
+      }
     });
 
     socketInstance.on('connect', () => {
